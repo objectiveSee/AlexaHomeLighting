@@ -1,0 +1,23 @@
+{
+  "private": "true",
+  "name": "AlexaConnectedHome",
+  "version": "v1.0.0",
+  "description": "Echo Lighting API Handler",
+
+  "scripts": {
+  },
+
+  "dependencies": {
+    "config" : "1.16.0",
+    "request" : "2.67.0",
+    "winston": "2.1.1"
+  },
+  
+  "devDependencies": {
+    "aws-sdk": "latest",
+    "grunt": "0.4.*",
+    "grunt-aws-lambda": "0.8.0",
+    "npm": "^2.8.3",
+    "mocha": "2.3.4"
+  }
+}
