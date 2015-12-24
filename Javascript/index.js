@@ -150,15 +150,20 @@ function handleControl(event, context) {
      * Fail the invocation if the header is unexpected. This example only demonstrates
      * turn on / turn off, hence we are filtering on anything that is not SwitchOnOffRequest.
      */
-     var requestType = event.header.name;
-    if (!event || !event.header || event.header.namespace != 'Control' || requestType != 'SwitchOnOffRequest') {
-        context.fail(generateControlError('SwitchOnOffRequest', 'UNSUPPORTED_OPERATION', 'Unrecognized operation'));
+    if (!event || !event.header || event.header.namespace !== 'Control' || event.header.name !== 'SwitchOnOffRequest') {
+    	var name = 'Unknown Event Name';
+    	if ( event && event.header && event.header.name ) {
+    		name = event.header.name;
+    	}
+        context.fail(generateControlError(name, 'UNSUPPORTED_OPERATION', 'Unrecognized operation'));
+        return;
     }
 
     /**
      * Retrieve the appliance id and accessToken from the incoming message.
      */
-    var applianceId = event.payload.appliance.applianceId;
+    var requestType = event.header.name;
+	var applianceId = event.payload.appliance.applianceId;
     var amazonAccessToken = event.payload.accessToken.trim(); // Amazon access token
     var particleDeviceId = event.payload.appliance.additionalApplianceDetails.particle_device_id;
 

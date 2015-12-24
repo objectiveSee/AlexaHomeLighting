@@ -53,6 +53,34 @@ module.exports.LightingAPI.ControlOff =
   }
 };
 
+module.exports.LightingAPI.ControlAlphaNumeric = 
+{
+    "header": {
+      "namespace": "Control",
+      "name": "AdjustNumericalSettingResponse",
+      "payloadVersion": "1"
+    },
+    "payload": {
+      "success": true
+    }
+}
+
+module.exports.LightingAPI.ControlAlphaNumericErrorResponse = 
+{
+  "header": {
+    "namespace": "Control",
+    "name": "AdjustNumericalSettingResponse",
+    "payloadVersion": "1"
+  },
+  "payload": {
+    "success": false,
+    "exception": {
+      "code": "UNSUPPORTED_OPERATION",
+      "description": "Unrecognized operation"
+    }
+  }
+};
+
 module.exports.LightingAPI.System =  
 {
   "header": {

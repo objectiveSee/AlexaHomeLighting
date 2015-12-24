@@ -39,7 +39,7 @@ describe('Configuration', function(){
 });
 
 describe('Handler', function(){
-	it('Should respond with error to malformed request',function(done){
+	it('Should respond with error to missing input',function(done){
 		main.handler(undefined, {
 			fail: function() {
 				done();
@@ -114,7 +114,6 @@ describe('Alexa Lighting API', function() {
 	});
 	it('Should handle missing particle_device_id in control command', function(done) {
 		var myEvent = TestEvents.LightingAPI.ControlOff;
-		assert.ok(particle_device_id, 'should be set from previous test');
 		delete myEvent.payload.appliance.additionalApplianceDetails.particle_device_id;
 		main.handler(myEvent, {
 			fail: function(response) {
@@ -122,6 +121,18 @@ describe('Alexa Lighting API', function() {
 				assert.strictEqual(response.payload.success, false, 'should have success set to false');
 				assert.ok(response.payload.exception.code, 'should have an exception code');
 				assert.ok(response.payload.exception.description, 'should have an exception description');
+				done();				
+			},
+			succeed: function(response) {
+				assert.fail(1,1,'success block should not be called');
+			}
+		});
+	});
+	it('Should handle unsupported AdjustNumericalSettingResponse command', function(done) {
+		var myEvent = TestEvents.LightingAPI.ControlAlphaNumeric;
+		main.handler(myEvent, {
+			fail: function(response) {
+				assert.deepEqual(response, TestEvents.LightingAPI.ControlAlphaNumericErrorResponse, 'generates an unsupported operation error');
 				done();				
 			},
 			succeed: function(response) {
