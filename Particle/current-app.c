@@ -28,23 +28,24 @@ static bool shouldBeOff = true; // cause first loop to trigger an off just in ca
 
 static int colors[3] = {0,30,0};
 static int countdown = 0;
+static const animationType kDefaultAnimation = animationCircles;
 animationType animation;
 
 /*************************************************/
 
 void setup() {
 
-    // delay(1000);    // safety delay
+    delay(1000);    // safety delay
 
     Particle.function("setAnimation", setAnimation);
     Particle.function("setOnOff", setOnOff);
     Particle.function("setBright", setBrightness);       // 12 char limit in cloud function name
     Particle.subscribe("internet_button_pressed", internet_button_pressed, MY_DEVICES); // Other Particles can call this even easier
     
-    animation = animationColorWheel;    // default value
+    animation = kDefaultAnimation;
     
     initStrips();
-    delay(100); // for fun.
+    delay(100); // for fun
 }
 
 void loop() {
