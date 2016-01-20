@@ -140,6 +140,15 @@ function handleDiscovery(event, context) {
     context.succeed(result);
 }
 
+
+// helper to validate name in handleControl()
+function isValidControlEventName(name) {
+	if ( name === 'SwitchOnOffRequest' || name === 'AdjustNumericalSettingRequest' ) {
+		return true;
+	}
+	return false;
+}
+
 /**
  * Control events are processed here.
  * This is called when Alexa requests an action (IE turn off appliance).
@@ -150,7 +159,8 @@ function handleControl(event, context) {
      * Fail the invocation if the header is unexpected. This example only demonstrates
      * turn on / turn off, hence we are filtering on anything that is not SwitchOnOffRequest.
      */
-    if (!event || !event.header || event.header.namespace !== 'Control' || event.header.name !== 'SwitchOnOffRequest') {
+
+    if (!event || !event.header || event.header.namespace !== 'Control' || !isValidControlEventName(event.header.name)) {
     	var name = 'Unknown Event Name';
     	if ( event && event.header && event.header.name ) {
     		name = event.header.name;
@@ -164,7 +174,7 @@ function handleControl(event, context) {
      */
     var requestType = event.header.name;
 	var applianceId = event.payload.appliance.applianceId;
-    var amazonAccessToken = event.payload.accessToken.trim(); // Amazon access token
+    // var amazonAccessToken = event.payload.accessToken.trim(); // Amazon access token
     var particleDeviceId = event.payload.appliance.additionalApplianceDetails.particle_device_id;
 
 
@@ -194,7 +204,7 @@ function handleControl(event, context) {
 
         		var description = err.description;
 				if ( !description ) {
-        	     	description = 'Generic Error reaching the device';
+        	     	description = '[onoff] Generic Error reaching the device';
              	}
  	        	myLog('Error', description);
     	        context.fail(generateControlError(requestType, 'DEPENDENT_SERVICE_UNAVAILABLE', description));
@@ -204,6 +214,59 @@ function handleControl(event, context) {
 				var headers = {
 	                namespace: 'Control',
 	                name: 'SwitchOnOffResponse',
+	                payloadVersion: '1'
+            	};
+	            var payloads = {
+	                success: true
+	            };
+	            var result = {
+	                header: headers,
+	                payload: payloads
+	            };
+	            myLog('sending success with result', result);
+	            context.succeed(result);
+        	}
+        });
+    } else if (event.header.namespace === 'Control' && event.header.name === 'AdjustNumericalSettingRequest') {     
+        /**
+         * Make a remote call to execute the action based on accessToken and the particleDeviceId
+         * Some other examples of checks:
+         *	validate the appliance is actually reachable else return TARGET_OFFLINE error
+         *	validate the authentication has not expired else return EXPIRED_ACCESS_TOKEN error
+         * Please see the technical documentation for detailed list of errors
+         */
+        var value = event.payload.adjustmentValue;
+        var unit = event.payload.adjustmentUnit;
+        var type = event.payload.adjustmentType;
+        if ((typeof value === 'undefined')||(typeof unit === 'undefined')||(typeof type === 'undefined')) {
+	     	var description = '[brightness] Error with function input values';
+	     	myLog('Error', description);
+        	context.fail(generateControlError(requestType, 'UNEXPECTED_INFORMATION_RECEIVED', description));
+        	return;
+        }
+        if ( unit !== 'PERCENTAGE' ) {
+	        var description = '[brightness] unsuported adjustment unit: '+unit;
+        	myLog('Error', description);
+        	context.fail(generateControlError(requestType, 'UNSUPPORTED_TARGET_SETTING', description));
+        	return;
+        }
+
+        particle.setBrightness(particleDeviceId, value, type, function(err) {
+
+        	if ( err ) {
+
+        		var description = err.description;
+				if ( !description ) {
+        	     	description = '[brightness] Generic Error reaching the device';
+             	}
+ 	        	myLog('Error', description);
+    	        context.fail(generateControlError(requestType, 'DEPENDENT_SERVICE_UNAVAILABLE', description));
+
+        	} else {
+
+				var headers = {
+	                namespace: 'Control',
+	                name: 'AdjustNumericalSettingResponse',
 	                payloadVersion: '1'
             	};
 	            var payloads = {

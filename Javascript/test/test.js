@@ -51,6 +51,18 @@ describe('Handler', function(){
 	});
 });
 
+
+/**
+ * Tests the test data module
+ */
+describe('Test Events', function() {
+	it('Should return a contructor function',function(){
+		assert(typeof TestEvents === 'function');
+		var t = new TestEvents();
+		assert(t.Discover);	// check that at least one of the expected fields is defined.
+	});
+});
+
 /**
  * Tests that excersise handling requests from the Alexa Lighting API.
  * See https://developer.amazon.com/public/binaries/content/assets/html/alexa-lighting-api.html
@@ -59,7 +71,8 @@ describe('Alexa Lighting API', function() {
 	this.timeout(5000);
 	var particle_device_id;
 	it('Should discover one light', function(done) {
-		main.handler(TestEvents.LightingAPI.Discover, {
+		var eventData = new TestEvents();
+		main.handler(eventData.Discover, {
 			fail: function() {
 				assert.fail(1,1,'fail block should not be called');
 			},
@@ -73,7 +86,8 @@ describe('Alexa Lighting API', function() {
 		});
 	});
 	it('Should check health of Particle Cloud server', function(done) {
-		main.handler(TestEvents.LightingAPI.System, {
+		var eventData = new TestEvents();
+		main.handler(eventData.System, {
 			fail: function() {
 				assert.fail(1,1,'fail block should not be called');
 			},
@@ -84,8 +98,9 @@ describe('Alexa Lighting API', function() {
 			}
 		});
 	});
-	it('Should turn on one light', function(done) {
-		var myEvent = TestEvents.LightingAPI.ControlOn;
+	it('Should turn off one light', function(done) {
+		var myEvent = new TestEvents().ControlOff;
+		assert.ok(myEvent, 'test event should be defined');
 		assert.ok(particle_device_id, 'should be set from previous test');
 		myEvent.payload.appliance.additionalApplianceDetails.particle_device_id = particle_device_id;
 		main.handler(myEvent, {
@@ -98,8 +113,8 @@ describe('Alexa Lighting API', function() {
 			}
 		});
 	});
-	it('Should turn off one light', function(done) {
-		var myEvent = TestEvents.LightingAPI.ControlOff;
+	it('Should turn on one light', function(done) {
+		var myEvent = new TestEvents().ControlOn;
 		assert.ok(particle_device_id, 'should be set from previous test');
 		myEvent.payload.appliance.additionalApplianceDetails.particle_device_id = particle_device_id;
 		main.handler(myEvent, {
@@ -113,7 +128,7 @@ describe('Alexa Lighting API', function() {
 		});
 	});
 	it('Should handle missing particle_device_id in control command', function(done) {
-		var myEvent = TestEvents.LightingAPI.ControlOff;
+		var myEvent = new TestEvents().ControlOff;
 		delete myEvent.payload.appliance.additionalApplianceDetails.particle_device_id;
 		main.handler(myEvent, {
 			fail: function(response) {
@@ -128,11 +143,15 @@ describe('Alexa Lighting API', function() {
 			}
 		});
 	});
-	it('Should handle unsupported AdjustNumericalSettingResponse command', function(done) {
-		var myEvent = TestEvents.LightingAPI.ControlAlphaNumeric;
+	it('Should handle unsupported Control command', function(done) {
+		var testEvents = new TestEvents();
+		var myEvent = testEvents.ControlAlphaNumeric;
+		myEvent.header.name = 'Unsupported Test Command';
 		main.handler(myEvent, {
 			fail: function(response) {
-				assert.deepEqual(response, TestEvents.LightingAPI.ControlAlphaNumericErrorResponse, 'generates an unsupported operation error');
+				var expected = testEvents.ControlAlphaNumericErrorResponse;
+				expected.header.name = myEvent.header.name;
+				assert.deepEqual(response, testEvents.ControlAlphaNumericErrorResponse, 'generates an unsupported operation error');
 				done();				
 			},
 			succeed: function(response) {
@@ -140,6 +159,77 @@ describe('Alexa Lighting API', function() {
 			}
 		});
 	});
+
+	it('Should return error if missing parameters for brightness command', function(done) {
+		var eventData = new TestEvents();
+		var myEvent = eventData.ControlAlphaNumeric;
+		myEvent.payload.appliance.additionalApplianceDetails.particle_device_id = particle_device_id;
+		delete myEvent.payload.adjustmentValue;
+		main.handler(myEvent, {
+			fail: function(response) {
+				assert.strictEqual(response.payload.success, false, 'should have success set to false');
+				assert.strictEqual(response.payload.exception.code, 'UNEXPECTED_INFORMATION_RECEIVED');
+				assert.ok(response.payload.exception.description, 'should have an exception description');
+				done();				
+			},
+			succeed: function(response) {
+				assert.fail(1,1,'success block should not be called');
+			}
+		});
+	});
+	it('Should return error if unit type is unsupported for brightness command', function(done) {
+		var eventData = new TestEvents();
+		var myEvent = eventData.ControlAlphaNumeric;
+		myEvent.payload.appliance.additionalApplianceDetails.particle_device_id = particle_device_id;
+		myEvent.payload.adjustmentUnit = 'Snickers Bar';
+		main.handler(myEvent, {
+			fail: function(response) {
+				assert.strictEqual(response.payload.success, false, 'should have success set to false');
+				assert.strictEqual(response.payload.exception.code, 'UNSUPPORTED_TARGET_SETTING');
+				assert.ok(response.payload.exception.description, 'should have an exception description');
+				done();				
+			},
+			succeed: function(response) {
+				assert.fail(1,1,'success block should not be called');
+			}
+		});
+	});
+	it('Should to brightness to absolute 100%', function(done) {
+		var eventData = new TestEvents();
+		var myEvent = eventData.ControlAlphaNumeric;
+		assert.strictEqual(myEvent.payload.adjustmentType, 'ABSOLUTE');
+		assert.strictEqual(myEvent.payload.adjustmentValue, 100.0);
+		assert.strictEqual(myEvent.payload.adjustmentUnit, 'PERCENTAGE');
+		myEvent.payload.appliance.additionalApplianceDetails.particle_device_id = particle_device_id;
+		main.handler(myEvent, {
+			fail: function() {
+				assert.fail(1,1,'fail block should not be called');
+			},
+			succeed: function(response) {
+				assert.strictEqual(response.payload.success, true, 'should have success set to true');
+				done();
+			}
+		});
+	});
+	it('Should to brightness relative -50%', function(done) {
+		var eventData = new TestEvents();
+		var myEvent = eventData.ControlAlphaNumeric;
+		myEvent.payload.adjustmentType = 'RELATIVE';
+		myEvent.payload.adjustmentValue = -50.0;
+		assert.strictEqual(myEvent.payload.adjustmentUnit, 'PERCENTAGE');
+		myEvent.payload.appliance.additionalApplianceDetails.particle_device_id = particle_device_id;
+		main.handler(myEvent, {
+			fail: function() {
+				assert.fail(1,1,'fail block should not be called');
+			},
+			succeed: function(response) {
+				assert.strictEqual(response.payload.success, true, 'should have success set to true');
+				done();
+			}
+		});
+	});
+
+	// write tests for missing value/unit/type for brightness 
 });
 
 /**
