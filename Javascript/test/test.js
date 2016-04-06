@@ -194,7 +194,7 @@ describe('Alexa Lighting API', function() {
 			}
 		});
 	});
-	it('Should to brightness to absolute 100%', function(done) {
+	it('Should set brightness to absolute 100%', function(done) {
 		var eventData = new TestEvents();
 		var myEvent = eventData.ControlAlphaNumeric;
 		assert.strictEqual(myEvent.payload.adjustmentType, 'ABSOLUTE');
@@ -211,7 +211,7 @@ describe('Alexa Lighting API', function() {
 			}
 		});
 	});
-	it('Should to brightness relative -50%', function(done) {
+	it('Should set brightness relative -50%', function(done) {
 		var eventData = new TestEvents();
 		var myEvent = eventData.ControlAlphaNumeric;
 		myEvent.payload.adjustmentType = 'RELATIVE';
