@@ -4,16 +4,21 @@ var log = require('./log.js');
 
 
 var Particle = function(options) {
+
 	this.base_url = 'https://api.particle.io/v1/devices/';
 	this.particle_access_token = config.get('Particle.access_token');
-	this.applicanceId = options.appliance_id;
+	this.applianceId = options.appliance_id;
 	this.deviceID = options.device_id;
+	this.friendly_name = options.friendly_name;
+	this.friendly_description = options.friendly_description;
+	this.name = options.name;
+
 	if ( !this.particle_access_token ) {
 		log('ERROR: MISSING PARTICLE TOKEN IN CONFIG');
 		throw new Error('MISSING PARTICLE TOKEN IN CONFIG');
 	}
-	if ( !this.deviceID || !this.applicanceId ) {
-		var err = 'ERROR: MISSING PARTICLE Device ('+this.deviceID+') or Applicance ID ('+this.applicanceId+')';
+	if ( !this.deviceID || !this.applianceId ) {
+		var err = 'ERROR: MISSING PARTICLE Device ('+this.deviceID+') or Applicance ID ('+this.applianceId+')';
 		log(err);
 		throw new Error(err);
 	}

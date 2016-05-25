@@ -159,6 +159,7 @@ function handleDiscovery(event, context) {
      // TODO: add support back for 'setPercentage', 'incrementPercentage', 'decrementPercentage',  in actions
 
     var appliances = _.map(devices, function(device) {
+    	console.log('Device = '+JSON.stringify(device));
 		var applianceDiscovered = {
 			applianceId: device.applianceId,
 			manufacturerName: 'KurodaLightingCompany',

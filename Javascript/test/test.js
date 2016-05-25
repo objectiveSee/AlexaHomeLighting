@@ -93,6 +93,18 @@ describe('Alexa Lighting API', function() {
 				assert.equal(appliances.length, COUNT_LIGHTS, 'expect '+COUNT_LIGHTS+' devices to be found');
 				particle_device_id = appliances[0].additionalApplianceDetails.particle_device_id;
 				assert.ok(particle_device_id,'Discovery response should contain a particle device ID');
+
+				var expectedKeys = ["applianceId","manufacturerName","modelName","version","friendlyName","friendlyDescription","isReachable","additionalApplianceDetails"];
+				_.each(appliances, function(d) {
+					var theKeys = Object.keys(d);
+					assert(theKeys.length > 0);
+					_.each(expectedKeys, function(key) {
+						assert(theKeys.indexOf(key) >= 0);
+						assert(d[key] != undefined, 'Expected the key "'+key+'" to not be undefined. Device = '+JSON.stringify(d));
+						assert(d[key] !== 'undefined');
+					});
+				});
+
 				done();
 			}
 		});
