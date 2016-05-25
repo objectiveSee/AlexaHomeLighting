@@ -6,7 +6,7 @@ var fs 					= require('fs');
 var _ 					= require('underscore');
 
 var main 				= require('../index.js');
-var TestEvents 			= require('./test-events.js');
+var TestEvents 			= require('./test-events-api-version-2.js');
 var Particle 			= require('../particle.js');
 
 
@@ -80,7 +80,8 @@ describe('Test Events', function() {
 describe('Alexa Lighting API', function() {
 	this.timeout(5000);
 	var particle_device_id;
-	it('Should discover one light', function(done) {
+	var COUNT_LIGHTS = 2;
+	it('Should discover all the lights', function(done) {
 		var eventData = new TestEvents();
 		main.handler(eventData.Discover, {
 			fail: function() {
@@ -88,7 +89,8 @@ describe('Alexa Lighting API', function() {
 			},
 			succeed: function(response) {
 				var appliances = response.payload.discoveredAppliances;
-				assert.equal(appliances.length, 1, 'expect 1 device to be found');
+				console.log('Appliances = '+JSON.stringify(appliances,'\t','\t'));
+				assert.equal(appliances.length, COUNT_LIGHTS, 'expect '+COUNT_LIGHTS+' devices to be found');
 				particle_device_id = appliances[0].additionalApplianceDetails.particle_device_id;
 				assert.ok(particle_device_id,'Discovery response should contain a particle device ID');
 				done();
@@ -119,7 +121,6 @@ describe('Alexa Lighting API', function() {
 				assert.fail(1,1,'fail block should not be called');
 			},
 			succeed: function(response) {
-				assert.strictEqual(response.payload.success, true, 'should have success set to true');
 				done();
 			}
 		});
@@ -133,7 +134,6 @@ describe('Alexa Lighting API', function() {
 				assert.fail(1,1,'fail block should not be called');
 			},
 			succeed: function(response) {
-				assert.strictEqual(response.payload.success, true, 'should have success set to true');
 				done();
 			}
 		});
@@ -154,6 +154,7 @@ describe('Alexa Lighting API', function() {
 			}
 		});
 	});
+	/**
 	it('Should handle unsupported Control command', function(done) {
 		var testEvents = new TestEvents();
 		var myEvent = testEvents.ControlAlphaNumeric;
@@ -239,6 +240,7 @@ describe('Alexa Lighting API', function() {
 			}
 		});
 	});
+	*/
 
 	// write tests for missing value/unit/type for brightness 
 });

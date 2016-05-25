@@ -7,7 +7,12 @@ var _ 					= require('underscore');
 var Particle 			= require('./particle.js');
 var log 				= require('./log.js');
 
-var lightingApiNamespaces = ['Discovery','Control','System'];
+var PAYLOAD_VERSION = 2;
+var CONTROL_NAME_SPACE = 'Alexa.ConnectedHome.Control';
+var DISCOVERY_NAME_SPACE = 'Alexa.ConnectedHome.Discovery';
+var SYSTEM_NAME_SPACE = 'Alexa.ConnectedHome.System';
+var lightingApiNamespaces = [CONTROL_NAME_SPACE,DISCOVERY_NAME_SPACE,SYSTEM_NAME_SPACE];
+
 
 /**
  * Returns an array of newly created particle objects.
@@ -58,6 +63,15 @@ exports.handler = function(event, context) {
 
     myLog('API Input', 'Handler Called. Event: '+ JSON.stringify(event) + ', Context:' + JSON.stringify(context));
 
+    if ( !event || !event.header ) {
+    	context.fail('Event is missing header.');
+    	return;
+    }
+    if ( event.header.payloadVersion != PAYLOAD_VERSION ) {
+    	context.fail('Header specifies payload version '+event.header.payloadVersion+' but skill is using '+PAYLOAD_VERSION);
+    	return;
+    }
+
     if ( isLightingAPIRequest(event,context) ) {
 
 	    switch (event.header.namespace) {
@@ -68,7 +82,7 @@ exports.handler = function(event, context) {
 	         * can use the accessToken that is made available as part of the payload to determine
 	         * the customer.
 	         */
-	        case 'Discovery':
+	        case DISCOVERY_NAME_SPACE:
 	            handleDiscovery(event, context);
 	            break;
 
@@ -77,12 +91,12 @@ exports.handler = function(event, context) {
 	             * given device on, off or brighten. This message comes with the "appliance"
 	             * parameter which indicates the appliance that needs to be acted on.
 	             */
-	        case 'Control':
+	        case CONTROL_NAME_SPACE:
 	            handleControl(event, context);
 	            break;
 
 
-	        case 'System':
+	        case SYSTEM_NAME_SPACE:
 	        	handleSystem(event, context);
 		        break;
 
@@ -132,14 +146,18 @@ function handleDiscovery(event, context) {
      * Crafting the response header
      */
     var headers = {
-        namespace: 'Discovery',
+        namespace: DISCOVERY_NAME_SPACE,
         name: 'DiscoverAppliancesResponse',
-        payloadVersion: '1'
+        payloadVersion: PAYLOAD_VERSION,
+        messageId: event.header.messageId
     };
 
     /**
      * Response body will be an array of discovered devices.
      */
+
+     // TODO: add support back for 'setPercentage', 'incrementPercentage', 'decrementPercentage',  in actions
+
     var appliances = _.map(devices, function(device) {
 		var applianceDiscovered = {
 			applianceId: device.applianceId,
@@ -149,6 +167,7 @@ function handleDiscovery(event, context) {
 			friendlyName: device.friendly_name,
 			friendlyDescription: device.friendly_description,
 			isReachable: true,
+			actions: ['turnOff', 'turnOn'],
 			additionalApplianceDetails: {
 				/**
 				* OPTIONAL:
@@ -182,7 +201,7 @@ function handleDiscovery(event, context) {
 
 // helper to validate name in handleControl()
 function isValidControlEventName(name) {
-	if ( name === 'SwitchOnOffRequest' || name === 'AdjustNumericalSettingRequest' ) {
+	if ( name === 'TurnOnRequest' || name === 'TurnOffRequest' ) {
 		return true;
 	}
 	return false;
@@ -199,7 +218,7 @@ function handleControl(event, context) {
      * turn on / turn off, hence we are filtering on anything that is not SwitchOnOffRequest.
      */
 
-    if (!event || !event.header || event.header.namespace !== 'Control' || !isValidControlEventName(event.header.name)) {
+    if (!event || !event.header || event.header.namespace !== CONTROL_NAME_SPACE || !isValidControlEventName(event.header.name)) {
     	var name = 'Unknown Event Name';
     	if ( event && event.header && event.header.name ) {
     		name = event.header.name;
@@ -228,7 +247,7 @@ function handleControl(event, context) {
         return;
     }
 
-    if (event.header.namespace === 'Control' && event.header.name === 'SwitchOnOffRequest') {     
+    if ((event.header.name === 'TurnOnRequest')||(event.header.name === 'TurnOffRequest')) {     
         /**
          * Make a remote call to execute the action based on accessToken and the particleDeviceId and the switchControlAction
          * Some other examples of checks:
@@ -237,9 +256,10 @@ function handleControl(event, context) {
          * Please see the technical documentation for detailed list of errors
          */
         var make_on = false;
-        if (event.payload.switchControlAction === 'TURN_ON') {
+        if (event.header.name === 'TurnOnRequest') {
         	make_on = true;
-        } else if (event.payload.switchControlAction === 'TURN_OFF') {
+        } else {
+        	//event.payload.switchControlAction === 'TurnOffRequest'
         	make_on = false;
         }
 
@@ -256,23 +276,22 @@ function handleControl(event, context) {
 
         	} else {
 
+        		var confirmationName = make_on ? 'TurnOnConfirmation':'TurnOffConfirmation';
 				var headers = {
-	                namespace: 'Control',
-	                name: 'SwitchOnOffResponse',
-	                payloadVersion: '1'
+					messageId: event.header.messageId,
+	                namespace: CONTROL_NAME_SPACE,
+	                name: confirmationName,
+	                payloadVersion: PAYLOAD_VERSION
             	};
-	            var payloads = {
-	                success: true
-	            };
 	            var result = {
 	                header: headers,
-	                payload: payloads
+	                payload: {}
 	            };
 	            myLog('sending success with result', result);
 	            context.succeed(result);
         	}
         });
-    } else if (event.header.namespace === 'Control' && event.header.name === 'AdjustNumericalSettingRequest') {     
+    } else if (event.header.name === 'AdjustNumericalSettingRequest') {     
         /**
          * Make a remote call to execute the action based on accessToken and the particleDeviceId
          * Some other examples of checks:
@@ -312,7 +331,7 @@ function handleControl(event, context) {
 				var headers = {
 	                namespace: 'Control',
 	                name: 'AdjustNumericalSettingResponse',
-	                payloadVersion: '1'
+	                payloadVersion: PAYLOAD_VERSION
             	};
 	            var payloads = {
 	                success: true
@@ -334,7 +353,7 @@ function handleControl(event, context) {
 function handleSystem(event, context) {
 
     var requestType = event.header.name;
-    if (!event || !event.header || event.header.namespace != 'System' || requestType != 'HealthCheckRequest') {
+    if (!event || !event.header || event.header.namespace != SYSTEM_NAME_SPACE || requestType != 'HealthCheckRequest') {
         context.fail(generateControlError(requestType, 'UNSUPPORTED_OPERATION', 'Unrecognized operation'));
     }
 
@@ -344,23 +363,25 @@ function handleSystem(event, context) {
         return;
     }
 
-    if (event.header.namespace === 'System' && event.header.name === 'HealthCheckRequest') {     
+    if (event.header.name === 'HealthCheckRequest') {     
 
         device.healthCheck(function(err, is_connected) {
         	// Health checks always respond with success. If we do NOT get an error, then Particle Cloud is healthy.
 			// This is a check of the Particle Cloud, not of the particular device(s) we use
 			var headers = {
-				namespace: 'System',
-				name: 'HealthCheckRequest',
-				payloadVersion: '1'
+				namespace: SYSTEM_NAME_SPACE,
+				name: 'HealthCheckResponse',
+				payloadVersion: PAYLOAD_VERSION,
+				messageId: event.header.messageId
 			};
 			var healthy = false;
 			if ( !err ) {
 				healthy = true;
 			}
+			var healthMessage = healthy ? 'The Particle cloud is responsive' : 'Failed to speak to the Particle cloud';
 			var payloads = {
 				"isHealthy": healthy,
-				"description" : healthy ? 'The Particle cloud is responsive' : 'Failed to speak to the Particle cloud'
+				"description" : healthMessage	
 			};
 			var result = {
 				header: headers,
@@ -385,7 +406,7 @@ function generateControlError(name, code, description) {
     var headers = {
         namespace: 'Control',
         name: name,
-        payloadVersion: '1'
+        payloadVersion: PAYLOAD_VERSION
     };
 
     var payload = {
