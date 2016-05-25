@@ -1,12 +1,13 @@
 process.env.NODE_ENV = 'test';	// See log.js
 
-var assert = require('assert');
-var config = require('config');
-var fs = require('fs');
+var assert 				= require('assert');
+var config 				= require('config');
+var fs 					= require('fs');
+var _ 					= require('underscore');
 
-var main = require('../index.js');
-var TestEvents = require('./test-events.js');
-var particle = require('../particle.js');
+var main 				= require('../index.js');
+var TestEvents 			= require('./test-events.js');
+var Particle 			= require('../particle.js');
 
 
 // from http://stackoverflow.com/questions/31449000/suppress-console-log-of-successful-mocha-tests
@@ -31,10 +32,19 @@ var particle = require('../particle.js');
 describe('Configuration', function(){
 	it('should have expected config values',function(){
 		assert(config.get('Particle.access_token'));
-		assert(config.get('Particle.istanbul_lamp_device_id'));
-		assert(config.get('Particle.istanbul_lamp_appliance_id'));
+		assert(config.get('Particle.devices'));
 		assert(config.get('Amazon.lambda-arn'));
 		assert(config.get('Amazon.profile'));
+
+		var devices = config.get('Particle.devices');
+		assert(devices.length > 0);
+		_.each(devices, function(device) {
+			assert(device.device_id);
+			assert(device.appliance_id);
+			assert(device.name);
+			assert(device.friendly_name);
+			assert(device.friendly_description);
+		});
 	});
 });
 
@@ -104,7 +114,8 @@ describe('Alexa Lighting API', function() {
 		assert.ok(particle_device_id, 'should be set from previous test');
 		myEvent.payload.appliance.additionalApplianceDetails.particle_device_id = particle_device_id;
 		main.handler(myEvent, {
-			fail: function() {
+			fail: function(error) {
+				console.log('Failed with error: '+JSON.stringify(error));
 				assert.fail(1,1,'fail block should not be called');
 			},
 			succeed: function(response) {
@@ -236,15 +247,20 @@ describe('Alexa Lighting API', function() {
  * Tests the particle.js module
  */
 describe('Particle Module', function() {
-	this.timeout(5000);
 	var particle_device_id;
-	it('Should build particle cloud function URLs', function() {
-		var urlWithoutFunction = particle.makeURL('XXX');
-		var urlWithFunction = particle.makeURL('XXX', 'dog');
+	var devices = config.get('Particle.devices');
+	var firstDevice = devices[0];
+	var device = new Particle(firstDevice);
+
+	it('Should build particle cloud function URLs', function(done) {
+		var urlWithoutFunction = device.makeURL('XXX');
+		var urlWithFunction = device.makeURL('XXX', 'dog');
 		assert.strictEqual('https://api.particle.io/v1/devices/XXX', urlWithoutFunction);
 		assert.strictEqual('https://api.particle.io/v1/devices/XXX/dog', urlWithFunction);
-		var withToken = particle.appendAccessTokenForGetRequest(urlWithoutFunction);
-		assert.strictEqual('https://api.particle.io/v1/devices/XXX?access_token='+particle.particle_access_token, withToken);
+		var withToken = device.appendAccessTokenForGetRequest(urlWithoutFunction);
+		assert.strictEqual('https://api.particle.io/v1/devices/XXX?access_token='+device.particle_access_token, withToken);
+		done();
 	});
+
 });
 

@@ -2,11 +2,44 @@
  * For additional details, please refer to the Alexa Lighting API developer documentation 
  * https://developer.amazon.com/public/binaries/content/assets/html/alexa-lighting-api.html
  */
-var particle = require('./particle.js');
-var log = require('./log.js');
-
+var config 				= require('config');
+var _ 					= require('underscore');
+var Particle 			= require('./particle.js');
+var log 				= require('./log.js');
 
 var lightingApiNamespaces = ['Discovery','Control','System'];
+
+/**
+ * Returns an array of newly created particle objects.
+ */
+var createDevices = function() {
+	var infoArray = config.get('Particle.devices');
+	if( !infoArray ) {
+		return [];
+	}
+	var particles = [];
+	for ( var i = 0; i < infoArray.length; i++ ) {
+		var info = infoArray[i];
+		var p = new Particle(info);
+		particles.push(p);
+	}
+	return particles;
+};
+var devices = createDevices();	// not too efficient to do on each request, but YOLO.
+
+var anyDevice = function() {
+	if ( devices && devices.length > 0 ) {
+		return devices[0];
+	}
+	return undefined;
+};
+
+var getParticleByDeviceId = function(deviceId) {
+	// console.log('Looking for '+deviceId+' in '+JSON.stringify(devices));
+	return _.find(devices, function(device) {
+		return (device.deviceID == deviceId);
+	});
+};
 
 var isLightingAPIRequest = function(event, context) {
 	if (event && event.header && event.header.namespace ) {
@@ -72,15 +105,21 @@ exports.handler = function(event, context) {
  * Calls any API in the Particle cloud and see whether the cloud is responsive. Whether the actual light we 
  * are running the health check on is connected in not a concern.
 */
-exports.testHealthCheck = function() {
-	particle.healthCheck(particle.istanbulLampDeviceID, function(err,response) {
-		if ( response && !err ) {
-			log('health check done. Connected='+response.connected);
-		} else {
-			log('health check error! '+err.description);
-		}
-	});
-};
+// exports.testHealthCheck = function() {
+
+// 	var d = anyDevice();
+// 	if ( ! d ) {
+
+// 	}
+
+// 	particle.healthCheck(particle.istanbulLampDeviceID, function(err,response) {
+// 		if ( response && !err ) {
+// 			log('health check done. Connected='+response.connected);
+// 		} else {
+// 			log('health check error! '+err.description);
+// 		}
+// 	});
+// };
 
 /**
  * This method is invoked when we receive a "Discovery" message from Alexa Connected Home Skill.
@@ -101,27 +140,27 @@ function handleDiscovery(event, context) {
     /**
      * Response body will be an array of discovered devices.
      */
-    var appliances = [];
-
-    var applianceDiscovered = {
-        applianceId: particle.istanbulLampDeviceApplianceID,
-        manufacturerName: 'KurodaLightingCompany',
-        modelName: 'ST01',
-        version: 'VER01',
-        friendlyName: 'Chandelier',
-        friendlyDescription: 'The Istanbul Light Chandelier',
-        isReachable: true,
-        additionalApplianceDetails: {
-            /**
-             * OPTIONAL:
-             * We can use this to persist any appliance specific metadata.
-             * This information will be returned back to the driver when user requests
-             * action on this appliance.
-             */
-            'particle_device_id' : particle.istanbulLampDeviceID
-        }
-    };
-    appliances.push(applianceDiscovered);
+    var appliances = _.map(devices, function(device) {
+		var applianceDiscovered = {
+			applianceId: device.applianceId,
+			manufacturerName: 'KurodaLightingCompany',
+			modelName: 'ST01',
+			version: 'VER01',
+			friendlyName: device.friendly_name,
+			friendlyDescription: device.friendly_description,
+			isReachable: true,
+			additionalApplianceDetails: {
+				/**
+				* OPTIONAL:
+				* We can use this to persist any appliance specific metadata.
+				* This information will be returned back to the driver when user requests
+				* action on this appliance.
+				*/
+				'particle_device_id' : device.deviceID
+			}
+		};
+		return applianceDiscovered;
+    });
 
     /**
      * Craft the final response back to Alexa Connected Home Skill. This will include all the 
@@ -183,6 +222,12 @@ function handleControl(event, context) {
         return;
     }
 
+    var device = getParticleByDeviceId(particleDeviceId);
+    if ( !device ) {
+	    context.fail(generateControlError(event.header.name, 'NO_SUCH_TARGET', 'No device found with ID '+particleDeviceId));
+        return;
+    }
+
     if (event.header.namespace === 'Control' && event.header.name === 'SwitchOnOffRequest') {     
         /**
          * Make a remote call to execute the action based on accessToken and the particleDeviceId and the switchControlAction
@@ -191,14 +236,14 @@ function handleControl(event, context) {
          *	validate the authentication has not expired else return EXPIRED_ACCESS_TOKEN error
          * Please see the technical documentation for detailed list of errors
          */
-         var make_on = false;
+        var make_on = false;
         if (event.payload.switchControlAction === 'TURN_ON') {
         	make_on = true;
         } else if (event.payload.switchControlAction === 'TURN_OFF') {
         	make_on = false;
         }
 
-        particle.turnOnOff(particleDeviceId, make_on, function(err) {
+        device.turnOnOff(make_on, function(err) {
 
         	if ( err ) {
 
@@ -251,7 +296,7 @@ function handleControl(event, context) {
         	return;
         }
 
-        particle.setBrightness(particleDeviceId, value, type, function(err) {
+        device.setBrightness(value, type, function(err) {
 
         	if ( err ) {
 
@@ -293,31 +338,36 @@ function handleSystem(event, context) {
         context.fail(generateControlError(requestType, 'UNSUPPORTED_OPERATION', 'Unrecognized operation'));
     }
 
+    var device = anyDevice();
+    if ( !device ) {
+    	context.fail(generateControlError(requestType, 'INTERNAL_ERROR', 'No particle devices in config.'));
+        return;
+    }
+
     if (event.header.namespace === 'System' && event.header.name === 'HealthCheckRequest') {     
 
-        particle.healthCheck(particle.istanbulLampDeviceID, function(err, is_connected) {
-
+        device.healthCheck(function(err, is_connected) {
         	// Health checks always respond with success. If we do NOT get an error, then Particle Cloud is healthy.
-        	// This is a check of the Particle Cloud, not of the particular device(s) we use
+			// This is a check of the Particle Cloud, not of the particular device(s) we use
 			var headers = {
-                namespace: 'System',
-                name: 'HealthCheckRequest',
-                payloadVersion: '1'
-        	};
-        	var healthy = false;
-        	if ( !err ) {
-        		healthy = true;
-        	}
-            var payloads = {
-                "isHealthy": healthy,
-                "description" : healthy ? 'The Particle cloud is responsive' : 'Failed to speak to the Particle cloud'
-            };
-            var result = {
-                header: headers,
-                payload: payloads
-            };
-            myLog('Health Check', 'Result is: '+JSON.stringify(result));
-            context.succeed(result);
+				namespace: 'System',
+				name: 'HealthCheckRequest',
+				payloadVersion: '1'
+			};
+			var healthy = false;
+			if ( !err ) {
+				healthy = true;
+			}
+			var payloads = {
+				"isHealthy": healthy,
+				"description" : healthy ? 'The Particle cloud is responsive' : 'Failed to speak to the Particle cloud'
+			};
+			var result = {
+				header: headers,
+				payload: payloads
+			};
+			myLog('Health Check', 'Result is: '+JSON.stringify(result));
+			context.succeed(result);
         });
     }
 }

@@ -3,17 +3,21 @@ var config = require('config');
 var log = require('./log.js');
 
 
-var Particle = function() {
+var Particle = function(options) {
 	this.base_url = 'https://api.particle.io/v1/devices/';
 	this.particle_access_token = config.get('Particle.access_token');
+	this.applicanceId = options.appliance_id;
+	this.deviceID = options.device_id;
 	if ( !this.particle_access_token ) {
 		log('ERROR: MISSING PARTICLE TOKEN IN CONFIG');
 		throw new Error('MISSING PARTICLE TOKEN IN CONFIG');
 	}
+	if ( !this.deviceID || !this.applicanceId ) {
+		var err = 'ERROR: MISSING PARTICLE Device ('+this.deviceID+') or Applicance ID ('+this.applicanceId+')';
+		log(err);
+		throw new Error(err);
+	}
 };
-
-Particle.prototype.istanbulLampDeviceApplianceID = config.get('Particle.istanbul_lamp_appliance_id')
-Particle.prototype.istanbulLampDeviceID = config.get('Particle.istanbul_lamp_device_id');
 
 Particle.prototype.makeURL = function(particleDeviceId, function_name) {
 	var u = this.base_url + particleDeviceId;
@@ -27,13 +31,13 @@ Particle.prototype.appendAccessTokenForGetRequest = function(url) {
 	return url + '?access_token='+this.particle_access_token;
 };
 
-Particle.prototype.healthCheck = function(particleDeviceId, callback) {
+Particle.prototype.healthCheck = function(callback) {
 	
 	if ( !callback ) {
     	callback = function emptyCallback() {};
     }
 
-    var url =  this.makeURL(particleDeviceId, undefined);	// GET request w/ no function name
+    var url =  this.makeURL(this.deviceID, undefined);	// GET request w/ no function name
     url = this.appendAccessTokenForGetRequest(url);
 
     log('making GET request to '+url);
@@ -74,13 +78,13 @@ Particle.prototype.healthCheck = function(particleDeviceId, callback) {
 
 
 // curl https://api.particle.io/v1/devices/2d0038000247343337373738/setBright -d access_token=95f709384a855869194d62cd76ed95f9480303e2 -d arg="A100"
-Particle.prototype.setBrightness = function(particleDeviceId, value, type, callback) {
+Particle.prototype.setBrightness = function(value, type, callback) {
 
     if ( !callback ) {
     	callback = function emptyCallback() {};
     }
 
-	var url =  this.makeURL(particleDeviceId, 'setBright');
+	var url =  this.makeURL(this.deviceID, 'setBright');
 
 	var commandStr;
 	if ( type === 'ABSOLUTE') {
@@ -109,16 +113,18 @@ Particle.prototype.setBrightness = function(particleDeviceId, value, type, callb
 };
 
 // Sample request via command line:
-// curl https://api.particle.io/v1/devices/2d0038000247343337373738/setOnOff -d access_token=95f709384a855869194d62cd76ed95f9480303e2 -d arg="00FFFF"
+// curl https://api.particle.io/v1/devices/2d0038000247343337373738/setOnOff -d access_token=0fbbc0d0714bf6258e80f4f4bdee2f499702fc7c -d arg="00FFFF"
 // also there is... FYI
-// curl https://api.particle.io/v1/devices/2d0038000247343337373738/setAnimation -d access_token=95f709384a855869194d62cd76ed95f9480303e2 -d arg="wheel"
-Particle.prototype.turnOnOff = function(particleDeviceId, turn_on, callback) {
+// curl https://api.particle.io/v1/devices/2d0038000247343337373738/setAnimation -d access_token=0fbbc0d0714bf6258e80f4f4bdee2f499702fc7c -d arg="wheel"
+Particle.prototype.turnOnOff = function(turn_on, callback) {
+
+	// console.log('Making on off request for '+this.deviceID);
 
     if ( !callback ) {
     	callback = function emptyCallback() {};
     }
 
-	var url =  this.makeURL(particleDeviceId, 'setOnOff');
+	var url =  this.makeURL(this.deviceID, 'setOnOff');
 	var value = '000000';
 	if ( turn_on ) {
 	    value = '0000FF';
@@ -167,4 +173,6 @@ var handleResponse = function(error, response, body, callback) {
 	callback(error);
 };
 
-module.exports = new Particle();
+module.exports = Particle;
+
+
